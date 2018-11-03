@@ -1,0 +1,58 @@
+https://www.raspberrypi.org/forums/viewtopic.php?f=33&t=177157&sid=35b8eec323a12b3e9586d7690637b8cb&start=50
+
+// Copyright © 2017 Gordon Henderson, but since there is nothing special here you can do with it what you like.
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <termios.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+int charsWaiting (int fd)
+{
+  int count ;
+
+  if (ioctl (fd, FIONREAD, &count) == -1)
+  {
+    perror ("Something went wrong") ;
+    exit (EXIT_FAILURE) ;
+  }
+  return count ;
+}
+
+
+int main (void)
+{
+  struct termios options ;
+  int i, c, count ;
+
+  tcgetattr (fileno (stdin), &options) ;
+  cfmakeraw (&options) ;	// Note - also affects output
+  tcsetattr (fileno (stdin), TCSANOW, &options) ;
+  
+  printf ("Type something in the next 10 seconds ... \r\n") ;
+  for (i = 0 ; i < 10 ; ++i)
+  {
+    sleep (1) ;
+    printf ("%3d: %3d\r\n", 10 - i, charsWaiting (fileno (stdin))) ;
+  }
+
+  count = charsWaiting (fileno (stdin)) ;
+  printf ("\r\n") ;
+  printf ("You typed %d characters.\r\n", count) ;
+
+  for (i = 0 ; i < count ; ++i)
+  {
+    c = getchar () ;
+    printf ("%2d: '%c': %02X\r\n", i, c, c) ;
+  }
+
+  printf ("All done\r\n") ;
+
+  return 0 ;
+}
+
+Compile with the usual: gcc -Wall -Wextra -o input input.c and run... during the run I typed in "hello world":
