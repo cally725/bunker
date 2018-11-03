@@ -1,6 +1,11 @@
 #include <simple2d.h>
 #include <wiringPi.h>
 #include <time.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/select.h>
+#include <termios.h>
 
 /*
 Game    Room                Device                  WiringPi    Pi Pin  I/O
@@ -54,9 +59,6 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 
 #define MAX_CODE_NUMBER_DIGIT   7
 
-#define DOWN                    0
-#define UP                      1
-
 /*
  * Variable definition
  */
@@ -70,7 +72,7 @@ time_t tvLiftUpTimer = 0;
 time_t tvLiftDownTimer = 0;
 time_t noTimer = -1;
 
-char RefPhoneNumber[7] = {'B', '9', '5', '6', 'J', 'F', '6'};
+char RefPhoneNumber[7] = {'8', '9', '5', '6', 'J', 'F', '6'};
 char phoneNumber[7] = {' ', ' ', ' ', ' ', ' ', ' ', ' '};
 int didgitIndex = 0;
 int validPhoneNumber = 0;
@@ -94,7 +96,6 @@ int sequenceElapsedTime = 0;
 char *message;
 char *letter;
 int c=0;
-int keyState= UP;
 
 void (*render_fct[2])();
 S2D_Image *img;
@@ -112,10 +113,6 @@ S2D_Text *txtBot2;
 S2D_Sound *snd;
 S2D_Text *txt;
 
-/*
- * Structures
- */
- 
 static const int color[5][4] = {
  /* R    G    B    Button */
     1,   0,   0,   0,      // RED
@@ -124,6 +121,7 @@ static const int color[5][4] = {
     1,   1,   0,   2,      // YELLOW
     1,   1,   1,   4,      // WHITE
 };
+
 
 static int randColor[MAX_STAGES];
 
@@ -160,57 +158,6 @@ struct BAR v9 =  {533, 460, 5, 3, 0, 1, 5.0,   1};
 struct BAR v10 = {540, 460, 5, 35, 0, 1, 70.0,  1};
 
 S2D_Window *window;
-
-/*
- * Function :   InsertPhoneDidgit
- * Description: Insert the input caracter in the sirial string
- * 
- * Parameters:  c           Input character
- *
- * Return       No return value
- * 
- */
-
-void InsertPhoneDidgit(char c)
-{
-    if (validPhoneNumber == 0)
-    {
-        phoneNumber[didgitIndex++] = c;
-        if (didgitIndex >= MAX_CODE_NUMBER_DIGIT)
-            didgitIndex = 0;
-        //DisplayPhoneNumber();
-     }
-}
-
-/*
- * Function :   CheckPhoneNumber
- * Description: Check if the serial string is the same as the sample one
- * 
- * Parameters:  None
- *
- * Return       No return value
- * 
- */
-int CheckPhoneNumber()
-{
-    validPhoneNumber = 1;
-    int i; 
-    for (int j = 0; j < MAX_CODE_NUMBER_DIGIT; j++)
-    {
-        validPhoneNumber = 1;
-        for (i = 0; i < MAX_CODE_NUMBER_DIGIT; i++)
-            if (phoneNumber[(i+j) % MAX_CODE_NUMBER_DIGIT] != RefPhoneNumber[i])
-            {
-                validPhoneNumber = 0;
-                break;
-            }
-        if (validPhoneNumber == 1)
-            break;
-    }
-        
-    return validPhoneNumber;
-}
-
 
 /*
  * Function :   checkBypass
@@ -324,18 +271,7 @@ void CheckControls()
     checkBypass(tvLiftUpBypass, BYPASS_TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
 }
 
-/*
- * Function :   RenderVerticalMessage
- * Description: Verify all game inputs and bypass
- * 
- * Parameters:  x           x coordinate of the string to display
- *              y           x coordinate of the string to display
- *              *message    String to display
- *
- * Return       No return value
- * 
- */
-void RenderVerticalMessage(int x, int y, char *message)
+void renderVerticalMessage(int x, int y, char *message)
 {
     int i=0;
     
@@ -353,16 +289,7 @@ void RenderVerticalMessage(int x, int y, char *message)
     
 }
 
-/*
- * Function :   CalcRandColor
- * Description: Calculate random color sequence to display in the radar
- * 
- * Parameters:  None
- *
- * Return       No return value
- * 
- */
-void CalcRandColor()
+void calcRandColor()
 {
 	randColor[0] = rand() % MAX_COLOR;
 	while ((randColor[1] = (rand() % MAX_COLOR)) == randColor[0]);
@@ -376,16 +303,7 @@ void CalcRandColor()
 	while ((randColor[9] = (rand() % MAX_COLOR)) == randColor[8]);
 }
 
-/*
- * Function :   ResetStage
- * Description: Bring the game back to the first level
- * 
- * Parameters:  None
- *
- * Return       No return value
- * 
- */
-void ResetStage()
+void resetStage()
 {
     sequenceElapsedTime = 0;
     pressed = 0;
@@ -407,16 +325,7 @@ void ResetStage()
     txtBot2->x = j++;
 }
 
-/*
- * Function :   CompareSequence
- * Description: Check if the input color is the proper one
- * 
- * Parameters:  aColor      The color of the button pressed
- *
- * Return       No return value
- * 
- */
-void CompareSequence(int aColor)
+void compareSequence(int aColor)
 {
     lastColorPressed = aColor;
     if (color[randColor[pressed]][3] == aColor)
@@ -430,7 +339,7 @@ void CompareSequence(int aColor)
         if (pressed == MaxStage)
         {
             srand(rand());
-            CalcRandColor();
+            calcRandColor();
             
             clearScreenDelay = 0;
             MaxStage++;
@@ -466,20 +375,11 @@ void CompareSequence(int aColor)
     }
     else
     {
-        ResetStage();
+        resetStage();
     }
 }
 
-/*
- * Function :   InputButtonPressed
- * Description: Debouncing the botton entry
- * 
- * Parameters:  button      The button pressed
- *
- * Return       bool        one if a button was pressed
- * 
- */
-bool InputButtonPressed(int button)
+bool inputButtonPressed(int button)
 {
     bool press = false;
     while (digitalRead(button) == 0)
@@ -490,71 +390,52 @@ bool InputButtonPressed(int button)
     return press;
 }
 
-/*
- * Function :   CheckColorButtons
- * Description: Cicle between button colors to see if one was pressed
- * 
- * Parameters:  None
- *
- * Return       No return value
- * 
- */
-void CheckColorButtons()
+void checkColorButtons()
  {
     if (pressed != 0)
         sequenceElapsedTime++;
         
     if (sequenceElapsedTime > MAX_ELAPSED_TIME)
-        ResetStage();
+        resetStage();
         
     if (lastColorPressed != RED)
     {
-        if (InputButtonPressed(RED) == true)
+        if (inputButtonPressed(RED) == true)
         {
-            CompareSequence(RED);
+            compareSequence(RED);
         }
     }
     if (lastColorPressed != BLUE)
     {
-        if (InputButtonPressed(BLUE) == true)
+        if (inputButtonPressed(BLUE) == true)
         {
-            CompareSequence(BLUE);
+            compareSequence(BLUE);
         }
     }
     if (lastColorPressed != YELLOW)
     {
-        if (InputButtonPressed(YELLOW) == true)
+        if (inputButtonPressed(YELLOW) == true)
         {
-            CompareSequence(YELLOW);
+            compareSequence(YELLOW);
         }
     }
     if (lastColorPressed != GREEN)
     {
-        if (InputButtonPressed(GREEN) == true)
+        if (inputButtonPressed(GREEN) == true)
         {
-            CompareSequence(GREEN);
+            compareSequence(GREEN);
         }
     }
     if (lastColorPressed != WHITE)
     {
-        if (InputButtonPressed(WHITE) == true)
+        if (inputButtonPressed(WHITE) == true)
         {
-            CompareSequence(WHITE);
+            compareSequence(WHITE);
         }
     }  
 }
 
-/*
- * Function :   RenderBar
- * Description: Render a bar on the screen
- * 
- * Parameters:  *bar        Which bar to draw
- *              
- *
- * Return       No return value
- * 
- */
-void RenderBar(struct BAR *bar)
+void RenderBar(struct BAR *bar, int off)
 {
 
    int length = (int)((float) bar->actual * ((float) MaxStage / (float) MAX_STAGES));
@@ -593,16 +474,6 @@ void RenderBar(struct BAR *bar)
    bar->actual = bar->actual + bar->increment;
 }
 
-/*
- * Function :   RenderVoice
- * Description: Render the voice waveform
- * 
- * Parameters:  *offet      Start position of rendering
- *              
- *
- * Return       No return value
- * 
- */
 void RenderVoice(int *offset)
 {
     voice->x = *offset;
@@ -615,17 +486,7 @@ void RenderVoice(int *offset)
         *offset = 300;
 }
 
-/*
- * Function :   ClearScreen
- * Description: Set the screen to black
- * 
- * Parameters:  None
- *              
- *
- * Return       No return value
- * 
- */
-void ClearScreen()
+void clearScreen()
 {
     S2D_DrawTriangle(
         320,  90, 0, 0, 0, 1,
@@ -648,28 +509,10 @@ void ClearScreen()
         490, 165, 0, 0, 0, 1);
 }
 
-/*
- * Function :   Render
- * Description: Draw the radar
- * 
- * Parameters:  None
- *              
- *
- * Return       No return value
- * 
- */
-void Render() 
+void render() 
 {
-    if (!validPhoneNumber)
-    {
-        CheckControls();
-        ClearScreen();
-        return;
-    }
-    else
-    {
-        TimedActivate(TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
-    }
+    CheckControls();
+    TimedActivate(TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
 
     if (currentStage != MaxStage)
     {
@@ -677,11 +520,11 @@ void Render()
         for (int wait = 0; wait < 10000000; wait++)
             digitalRead(0);
     }
-    CheckColorButtons();
+    checkColorButtons();
 	   
     if (clearScreenDelay++ < CLEAR_SCREEN_DELAY)
     {
-        ClearScreen();
+        clearScreen();
 
         k = 0;
     }
@@ -763,24 +606,24 @@ void Render()
 
     S2D_DrawImage(img);
   
-    RenderBar(&h0);
-    RenderBar(&h1);
-    RenderBar(&h2);
-    RenderBar(&h3);
-    RenderBar(&h4);
-    RenderBar(&h5);
+    RenderBar(&h0, barLength);
+    RenderBar(&h1, barLength);
+    RenderBar(&h2, barLength);
+    RenderBar(&h3, barLength);
+    RenderBar(&h4, barLength);
+    RenderBar(&h5, barLength);
     
-    RenderBar(&v0);
-    RenderBar(&v1);
-    RenderBar(&v2);
-    RenderBar(&v3);
-    RenderBar(&v4);
-    RenderBar(&v5);
-    RenderBar(&v6);
-    RenderBar(&v7);
-    RenderBar(&v8);
-    RenderBar(&v9);
-    RenderBar(&v10);
+    RenderBar(&v0, barLength);
+    RenderBar(&v1, barLength);
+    RenderBar(&v2, barLength);
+    RenderBar(&v3, barLength);
+    RenderBar(&v4, barLength);
+    RenderBar(&v5, barLength);
+    RenderBar(&v6, barLength);
+    RenderBar(&v7, barLength);
+    RenderBar(&v8, barLength);
+    RenderBar(&v9, barLength);
+    RenderBar(&v10,barLength);
   
     S2D_DrawLine(78 + MaxStage * 7, 430, 186, 446, 1, 0, 0.7, 0, 1, 0, 0.7, 0, 1, 0, 0.7, 0, 1, 0, 0.7, 0, 1);
     S2D_DrawTriangle(75 + MaxStage * 7, 428, 0, 0.7, 0, 1,
@@ -849,22 +692,12 @@ void Render()
     }
 }
 
-
-/*
- * Function :   Monitor keyboard
- * 
- * Parameters:  S2D_Event       Keyboard event
- *              
- *
- * Return       No return value
- * 
- */
 void on_key(S2D_Event e) 
 {
     switch (e.type) 
     {
     case S2D_KEY_DOWN:
-        //printf("Key down: %s, %c\n", e.key, e.key[0]);
+        printf("Key down: %s\n", e.key);
         if (strcmp(e.key, "Escape") == 0) S2D_Close(window);
         if (strcmp(e.key, "Return") == 0) 
         {
@@ -880,34 +713,96 @@ void on_key(S2D_Event e)
             }
 
         }
-        InsertPhoneDidgit(e.key[0]);
-        if (CheckPhoneNumber() == 1)
-        {
-            TimedActivate(TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
-        }        
         break;
 
-    case S2D_KEY_HELD:
-         break;
+        case S2D_KEY_HELD:
+            printf("Key held: %s\n", e.key);
+            break;
 
-    case S2D_KEY_UP:
-         break;
+        case S2D_KEY_UP:
+            printf("Key up: %s\n", e.key);
+            break;
     }
 }
 
 
-/*
- * Function :   main
- * 
- * Parameters:  None       Keyboard event
- *              
- *
- * Return       int         1
- * 
- */
+void InsertPhoneDidgit(char c)
+{
+    if (validPhoneNumber == 0)
+    {
+        phoneNumber[didgitIndex++] = c;
+        if (didgitIndex >= MAX_CODE_NUMBER_DIGIT)
+            didgitIndex = 0;
+        //DisplayPhoneNumber();
+     }
+}
+
+int CheckPhoneNumber()
+{
+    validPhoneNumber = 1;
+    int i; 
+    for (int j = 0; j < MAX_CODE_NUMBER_DIGIT; j++)
+    {
+        validPhoneNumber = 1;
+        for (i = 0; i < MAX_CODE_NUMBER_DIGIT; i++)
+            if (phoneNumber[(i+j) % MAX_CODE_NUMBER_DIGIT] != RefPhoneNumber[i])
+            {
+                validPhoneNumber = 0;
+                break;
+            }
+        if (validPhoneNumber == 1)
+            break;
+    }
+        
+    return validPhoneNumber;
+}
+
+struct termios orig_termios;
+
+void reset_terminal_mode()
+{
+    tcsetattr(0, TCSANOW, &orig_termios);
+}
+
+void set_conio_terminal_mode()
+{
+    struct termios new_termios;
+
+    /* take two copies - one for now, one for later */
+    tcgetattr(0, &orig_termios);
+    memcpy(&new_termios, &orig_termios, sizeof(new_termios));
+
+    /* register cleanup handler, and set the new terminal mode */
+    atexit(reset_terminal_mode);
+    cfmakeraw(&new_termios);
+    tcsetattr(0, TCSANOW, &new_termios);
+}
+
+int kbhit()
+{
+    struct timeval tv = { 0L, 0L };
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(0, &fds);
+    return select(1, &fds, NULL, NULL, &tv);
+}
+
+int getch()
+{
+    int r;
+    unsigned char c;
+    if ((r = read(0, &c, sizeof(c))) < 0) {
+        return r;
+    } else {
+        return c;
+    }
+}
+
 int main() 
 {    
     wiringPiSetup() ;
+    //initscr();
+    //nodelay( stdscr, true ); 
   
     pinMode(SIMON_RED_BUTTON,   INPUT);
     pinMode(SIMON_BLUE_BUTTON,  INPUT);
@@ -938,13 +833,40 @@ int main()
     digitalWrite(TV_LIFT_UP,            LOW);
     pullUpDnControl(TV_LIFT_DOWN,       PUD_UP);
     digitalWrite(TV_LIFT_DOWN,          LOW);    
+    set_conio_terminal_mode();
     
+    while(!validPhoneNumber)
+    {
+        CheckControls();
+        
+        char c;
+
+        if (kbhit()) 
+        {
+            c = getch();   /* do some work */
+        
+            //printf("toto ");
+
+            if (c >= 0x20 && c <= 0x7F)
+            {
+                        printf("toto ");
+                //printf("%c ", c);
+                InsertPhoneDidgit(c);
+            }
+            if (CheckPhoneNumber() == 1)
+                TimedActivate(TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
+            }
+        }
+        reset_terminal_mode();
+    //endwin();
+    //puts("\n");
     srand(rand());
-    CalcRandColor();
+    calcRandColor();
 
     message = (char*) malloc(100 * sizeof(char));
 
-    render_fct[0] = Render;
+    render_fct[0] = render;
+
 
     letter = (char*) malloc(2 * sizeof(char));
     sprintf(letter, " ");
