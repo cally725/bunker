@@ -20,6 +20,7 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
                             TV lift up	            11	        26	    Out
                             TV lift up Bypass	    11	        26	    Out
                             TV lift down	        12	        19	    Out
+                            Hand Sensor Bypass      13	        21	    Out
 
 */
 
@@ -49,7 +50,10 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 #define TV_LIFT_UP              11
 #define BYPASS_TV_LIFT_UP       11
 #define TV_LIFT_DOWN            12
-#define TV_LIFT_UP_DELAY        60
+#define BYPASS_TV_LIFT_DOWN     12
+#define BYPASS_HAND_SENSOR      13
+#define TV_LIFT_UP_DELAY        40
+#define TV_LIFT_DOWN_DELAY      30
 #define DOOR_GACHE_DELAY        10
 
 #define MAX_CODE_NUMBER_DIGIT   7
@@ -65,6 +69,8 @@ char gunBypass[30] = {"BYPASS_GUN"};
 time_t gunBypassTimer = 0;
 char laserKeyBypass[30] = {"BYPASS_LASER_KEY"};
 char tvLiftUpBypass[30] = {"BYPASS_TV_LIFT_UP"};
+char tvLiftDownBypass[30] = {"BYPASS_TV_LIFT_DOWN"};
+char handSensorBypass[30] = {"BYPASS_HAND_SENSOR"};
 time_t gunDoorTimer = 0;
 time_t tvLiftUpTimer = 0;
 time_t tvLiftDownTimer = 0;
@@ -306,7 +312,8 @@ void CheckControls()
     // If pressed then open the door for 10 seconds
     if (digitalRead(GUN_SWITCH) == 0)
     {
-        TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY);
+        // TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY);
+        digitalWrite(GUN_DOOR, HIGH);
     }
     
     // Laser Key management
@@ -314,14 +321,16 @@ void CheckControls()
     // If turnes then enable Laser
     if (digitalRead(LASER_KEY) == 0)
     {
-        digitalWrite(LASER_POWER, HIGH);
+        digitalWrite(LASER_POWER, LOW);
     }
 
     // Bypass management    
     // Check if any of the bypass file exist
-    checkBypass(laserKeyBypass, BYPASS_LASER_KEY, HIGH, &noTimer, 0);
+    checkBypass(laserKeyBypass, BYPASS_LASER_KEY, LOW, &noTimer, 0);
     checkBypass(gunBypass, BYPASS_GUN, HIGH, &gunBypassTimer, DOOR_GACHE_DELAY);
-    checkBypass(tvLiftUpBypass, BYPASS_TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
+    checkBypass(tvLiftUpBypass, BYPASS_TV_LIFT_UP, LOW, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
+    checkBypass(tvLiftDownBypass, BYPASS_TV_LIFT_DOWN, LOW, &tvLiftDownTimer, TV_LIFT_DOWN_DELAY);
+    checkBypass(handSensorBypass, BYPASS_HAND_SENSOR, HIGH, &noTimer, 0);
 }
 
 /*
@@ -662,13 +671,18 @@ void Render()
 {
     if (!validPhoneNumber)
     {
+        TimedActivate(TV_LIFT_DOWN, LOW, &tvLiftDownTimer, TV_LIFT_DOWN_DELAY);
         CheckControls();
         ClearScreen();
         return;
     }
     else
     {
-        TimedActivate(TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
+        // Bring TV UP
+        TimedActivate(TV_LIFT_UP, LOW, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
+        // Shutdown Laser
+        digitalWrite(LASER_POWER, HIGH);
+
     }
 
     if (currentStage != MaxStage)
@@ -883,7 +897,7 @@ void on_key(S2D_Event e)
         InsertPhoneDidgit(e.key[0]);
         if (CheckPhoneNumber() == 1)
         {
-            TimedActivate(TV_LIFT_UP, HIGH, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
+            TimedActivate(TV_LIFT_UP, LOW, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
         }        
         break;
 
@@ -921,6 +935,7 @@ int main()
     pinMode(LASER_POWER,        OUTPUT);
     pinMode(TV_LIFT_UP,         OUTPUT);
     pinMode(TV_LIFT_DOWN,       OUTPUT);
+    pinMode(BYPASS_HAND_SENSOR, OUTPUT);
 
     pullUpDnControl(SIMON_RED_BUTTON,    PUD_UP);
     pullUpDnControl(SIMON_BLUE_BUTTON,   PUD_UP);
@@ -933,11 +948,13 @@ int main()
     digitalWrite(GUN_DOOR,              LOW);
     pullUpDnControl(LASER_KEY,          PUD_UP);
     pullUpDnControl(LASER_POWER,        PUD_UP);
-    digitalWrite(LASER_POWER,           LOW);
+    digitalWrite(LASER_POWER,           HIGH);
     pullUpDnControl(TV_LIFT_UP,         PUD_UP);
-    digitalWrite(TV_LIFT_UP,            LOW);
+    digitalWrite(TV_LIFT_UP,            HIGH);
     pullUpDnControl(TV_LIFT_DOWN,       PUD_UP);
-    digitalWrite(TV_LIFT_DOWN,          LOW);    
+    digitalWrite(TV_LIFT_DOWN,          HIGH);    
+    pullUpDnControl(BYPASS_HAND_SENSOR, PUD_UP);
+    digitalWrite(BYPASS_HAND_SENSOR,    LOW);
     
     srand(rand());
     CalcRandColor();
