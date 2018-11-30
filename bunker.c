@@ -71,6 +71,8 @@ char laserKeyBypass[30] = {"BYPASS_LASER_KEY"};
 char tvLiftUpBypass[30] = {"BYPASS_TV_LIFT_UP"};
 char tvLiftDownBypass[30] = {"BYPASS_TV_LIFT_DOWN"};
 char handSensorBypass[30] = {"BYPASS_HAND_SENSOR"};
+char stopBunker[20] = {"STOP_BUNKER"};
+
 time_t gunDoorTimer = 0;
 time_t tvLiftUpTimer = 0;
 time_t tvLiftDownTimer = 0;
@@ -102,7 +104,6 @@ char *letter;
 int c=0;
 int keyState= UP;
 
-void (*render_fct[2])();
 S2D_Image *img;
 S2D_Image *scan;
 S2D_Image *Missile;
@@ -261,6 +262,32 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                 }
         }
 	}
+}
+
+/*
+ * Function :   checkEndRequest
+ * Description: Check if the end file is present
+ *              if it is it means that we need to stop the program
+ * 
+ * Parameters:  file        Name of the file to check
+ *
+ * Return       No return value
+ * 
+ */
+int checkEndRequest(char *file)
+{
+	FILE *file1;
+    
+
+	file1 = fopen(file, "rb");
+	if (file1)
+	{
+        return 1;
+	}
+    else
+    {
+        return 0;
+    }
 }
 
 /*
@@ -909,6 +936,23 @@ void on_key(S2D_Event e)
     }
 }
 
+void Update()
+{
+    if (checkEndRequest(stopBunker) == 1)
+        {
+            S2D_FreeWindow(window);
+        }
+}
+
+void cleanUpFiles()
+{
+    remove("BYPASS_GUN");
+    remove("BYPASS_LASER_KEY");
+    remove("BYPASS_TV_LIFT_UP");
+    remove("BYPASS_TV_LIFT_DOWN");
+    remove("BYPASS_HAND_SENSOR");    
+    remove("STOP_BUNKER");
+}
 
 /*
  * Function :   main
@@ -921,6 +965,8 @@ void on_key(S2D_Event e)
  */
 int main() 
 {    
+    cleanUpFiles();
+    
     wiringPiSetup() ;
   
     pinMode(SIMON_RED_BUTTON,   INPUT);
@@ -961,14 +1007,12 @@ int main()
 
     message = (char*) malloc(100 * sizeof(char));
 
-    render_fct[0] = Render;
-
     letter = (char*) malloc(2 * sizeof(char));
     sprintf(letter, " ");
     
     txt = S2D_CreateText("Alien-Encounters-Regular.ttf", "", 40);
 
-    window = S2D_CreateWindow("Hello Triangle", 640, 480, NULL, render_fct[0], 0);
+    window = S2D_CreateWindow("Hello Triangle", 640, 480, Update, Render, 0);
 
     img = S2D_CreateImage("Radar2TransVide.png");
     scan = S2D_CreateImage("aiguillePPSuperSmall.png");    
@@ -1081,9 +1125,14 @@ int main()
 
     S2D_FreeSound(snd);  
   
-    S2D_FreeWindow(window);
+    //S2D_FreeWindow(window);
 
     S2D_Close(window);
+
+    digitalWrite(GUN_DOOR,              HIGH);
+    digitalWrite(LASER_POWER,           HIGH);
+    digitalWrite(TV_LIFT_UP,            HIGH);
+    digitalWrite(TV_LIFT_DOWN,          HIGH);    
 
     return 0;
 }
