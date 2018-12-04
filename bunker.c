@@ -8,6 +8,9 @@ Game    Room                Device                  WiringPi    Pi Pin  I/O
 Bunker	Exterieur	        Gun Switch	            5	        18	    In
 					        Gun Door	            6	        22	    Out
                             Gun Bypass	            6	        22	    Out                    
+                            Gun Light 1	            14	        23	    Out                    
+                            Gun Light 2	            15	        8	    Out                    
+                            Gun Light 3	            16	        10	    Out                    
                     
         Bunker              Simon rouge	            0	        11	    In 
                             Simon bleu	            1	        12	    In 
@@ -43,6 +46,10 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 
 #define GUN_SWITCH              5
 #define GUN_DOOR                6
+#define GUN_LIGHT_1             14
+#define GUN_LIGHT_2             15
+#define GUN_LIGHT_3             16
+
 #define BYPASS_GUN              6
 #define LASER_KEY               7
 #define LASER_POWER             10
@@ -102,7 +109,8 @@ int sequenceElapsedTime = 0;
 char *message;
 char *letter;
 int c=0;
-int keyState= UP;
+int keyState = UP;
+int gunLights = 3;
 
 S2D_Image *img;
 S2D_Image *scan;
@@ -336,11 +344,26 @@ void CheckControls()
 {
     // Gun management
     // Check if the Gun switch is pressed (set to ground)
-    // If pressed then open the door for 10 seconds
+    // If pressed then close the corresponding light and open the door if all lights are off
     if (digitalRead(GUN_SWITCH) == 0)
     {
-        // TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY);
-        digitalWrite(GUN_DOOR, HIGH);
+		switch (gunLights)
+		{
+			case 3:
+				digitalWrite(GUN_LIGHT_3, HIGH);
+				gunLights--;
+				break;
+			case 2:
+				digitalWrite(GUN_LIGHT_2, HIGH);
+				gunLights--;
+				break;
+			case 1:
+				// TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY);
+				digitalWrite(GUN_LIGHT_1, HIGH);
+				digitalWrite(GUN_DOOR, HIGH);
+				gunLights--;
+				break;
+		}
     }
     
     // Laser Key management
@@ -968,7 +991,9 @@ int main()
     cleanUpFiles();
     
     wiringPiSetup() ;
-  
+	
+	gunLights = 3;
+
     pinMode(SIMON_RED_BUTTON,   INPUT);
     pinMode(SIMON_BLUE_BUTTON,  INPUT);
     pinMode(SIMON_YELLOW_BUTTON,INPUT);
@@ -977,6 +1002,9 @@ int main()
     
     pinMode(GUN_SWITCH,         INPUT);
     pinMode(GUN_DOOR,           OUTPUT);
+    pinMode(GUN_LIGHT_1,        OUTPUT);
+    pinMode(GUN_LIGHT_2,        OUTPUT);
+    pinMode(GUN_LIGHT_3,        OUTPUT);
     pinMode(LASER_KEY,          INPUT);
     pinMode(LASER_POWER,        OUTPUT);
     pinMode(TV_LIFT_UP,         OUTPUT);
@@ -992,6 +1020,12 @@ int main()
     pullUpDnControl(GUN_SWITCH,         PUD_UP);
     pullUpDnControl(GUN_DOOR,           PUD_UP);
     digitalWrite(GUN_DOOR,              LOW);
+    pullUpDnControl(GUN_LIGHT_1,        PUD_UP);
+    digitalWrite(GUN_LIGHT_1,           LOW);
+    pullUpDnControl(GUN_LIGHT_2,        PUD_UP);
+    digitalWrite(GUN_LIGHT_2,           LOW);
+    pullUpDnControl(GUN_LIGHT_3,        PUD_UP);
+    digitalWrite(GUN_LIGHT_3,           LOW);
     pullUpDnControl(LASER_KEY,          PUD_UP);
     pullUpDnControl(LASER_POWER,        PUD_UP);
     digitalWrite(LASER_POWER,           HIGH);
@@ -1133,6 +1167,9 @@ int main()
     digitalWrite(LASER_POWER,           HIGH);
     digitalWrite(TV_LIFT_UP,            HIGH);
     digitalWrite(TV_LIFT_DOWN,          HIGH);    
+    digitalWrite(GUN_LIGHT_1,           HIGH);
+    digitalWrite(GUN_LIGHT_2,           HIGH);
+    digitalWrite(GUN_LIGHT_3,           HIGH);	
 
     return 0;
 }
