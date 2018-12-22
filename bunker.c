@@ -4,7 +4,6 @@
 
 /*
 Game    Room                Device                  WiringPi    Pi Pin  I/O
-
 Bunker	Exterieur	        Gun Switch	            5	        18	    In
 					        Gun Door	            6	        22	    Out
                             Gun Bypass	            6	        22	    Out                    
@@ -24,7 +23,6 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
                             TV lift up Bypass	    11	        26	    Out
                             TV lift down	        12	        19	    Out
                             Hand Sensor Bypass      13	        21	    Out
-
 */
 
 #define MAX_STAGES              11
@@ -59,8 +57,8 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 #define TV_LIFT_DOWN            12
 #define BYPASS_TV_LIFT_DOWN     12
 #define BYPASS_HAND_SENSOR      13
-#define TV_LIFT_UP_DELAY        40
-#define TV_LIFT_DOWN_DELAY      30
+#define TV_LIFT_UP_DELAY        60
+#define TV_LIFT_DOWN_DELAY      60
 #define DOOR_GACHE_DELAY        10
 
 #define MAX_CODE_NUMBER_DIGIT   7
@@ -269,6 +267,7 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
 
                 }
         }
+        fclose(file1);
 	}
 }
 
@@ -290,6 +289,7 @@ int checkEndRequest(char *file)
 	file1 = fopen(file, "rb");
 	if (file1)
 	{
+        fclose(file1);
         return 1;
 	}
     else
@@ -330,6 +330,15 @@ void TimedActivate(int pin, int state, time_t *startTime, int delay)
     }
 }
 
+int debunceInput(int input)
+{
+    if (digitalRead(input) == 0)
+    {
+        while (digitalRead(input) == 0);
+        return 0;
+    }
+    return 1;
+}
                             
 /*
  * Function :   CheckControls
@@ -345,7 +354,7 @@ void CheckControls()
     // Gun management
     // Check if the Gun switch is pressed (set to ground)
     // If pressed then close the corresponding light and open the door if all lights are off
-    if (digitalRead(GUN_SWITCH) == 0)
+    if (debunceInput(GUN_SWITCH) == 0)
     {
 		switch (gunLights)
 		{
@@ -377,7 +386,7 @@ void CheckControls()
     // Bypass management    
     // Check if any of the bypass file exist
     checkBypass(laserKeyBypass, BYPASS_LASER_KEY, LOW, &noTimer, 0);
-    checkBypass(gunBypass, BYPASS_GUN, HIGH, &gunBypassTimer, DOOR_GACHE_DELAY);
+    checkBypass(gunBypass, BYPASS_GUN, HIGH, &noTimer, 0);
     checkBypass(tvLiftUpBypass, BYPASS_TV_LIFT_UP, LOW, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
     checkBypass(tvLiftDownBypass, BYPASS_TV_LIFT_DOWN, LOW, &tvLiftDownTimer, TV_LIFT_DOWN_DELAY);
     checkBypass(handSensorBypass, BYPASS_HAND_SENSOR, HIGH, &noTimer, 0);
@@ -929,21 +938,21 @@ void on_key(S2D_Event e)
     {
     case S2D_KEY_DOWN:
         //printf("Key down: %s, %c\n", e.key, e.key[0]);
-        if (strcmp(e.key, "Escape") == 0) S2D_Close(window);
-        if (strcmp(e.key, "Return") == 0) 
-        {
-            MaxStage++;
-            if (MaxStage == MAX_STAGES)
-            {
-                missionCompleted = true;
-                S2D_SetText(txtTop, "7 4 1 9 5");
-                S2D_SetText(txtTop2, "Mission Complete!");
-                S2D_SetText(txtBot, "Mission Completed!");
-                S2D_SetText(txtBot2, "Mission Completed!");
-                S2D_PlaySound(snd);
-            }
+        //if (strcmp(e.key, "Escape") == 0) S2D_Close(window);
+        //if (strcmp(e.key, "Return") == 0) 
+        //{
+        //    MaxStage++;
+        //    if (MaxStage == MAX_STAGES)
+        //    {
+        //        missionCompleted = true;
+        //        S2D_SetText(txtTop, "7 4 1 9 5");
+        //        S2D_SetText(txtTop2, "Mission Complete!");
+        //        S2D_SetText(txtBot, "Mission Completed!");
+        //        S2D_SetText(txtBot2, "Mission Completed!");
+        //        S2D_PlaySound(snd);
+        //    }
 
-        }
+        //}
         InsertPhoneDidgit(e.key[0]);
         if (CheckPhoneNumber() == 1)
         {
@@ -1137,6 +1146,7 @@ int main()
 
     window->on_key = on_key;
 
+    S2D_ShowCursor(false);
     S2D_Show(window);
     S2D_FreeImage(scan);  
     S2D_FreeImage(img);  
@@ -1170,6 +1180,7 @@ int main()
     digitalWrite(GUN_LIGHT_1,           HIGH);
     digitalWrite(GUN_LIGHT_2,           HIGH);
     digitalWrite(GUN_LIGHT_3,           HIGH);	
+    digitalWrite(BYPASS_HAND_SENSOR,    HIGH);	
 
     return 0;
 }
