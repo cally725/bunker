@@ -87,6 +87,7 @@ char RefPhoneNumber[7] = {'B', '9', '5', '6', 'J', 'F', '6'};
 char phoneNumber[7] = {' ', ' ', ' ', ' ', ' ', ' ', ' '};
 int didgitIndex = 0;
 int validPhoneNumber = 0;
+int laserActivated = 0;
 
 bool missionCompleted = false;
 int i = 0;
@@ -123,8 +124,9 @@ S2D_Text *txtTop2;
 S2D_Text *txtBot;
 S2D_Text *txtBot2;
 S2D_Sound *snd;
+S2D_Sound *laser;
 S2D_Text *txt;
-
+S2D_Music *mus;
 /*
  * Structures
  */
@@ -378,9 +380,13 @@ void CheckControls()
     // Laser Key management
     // Check if Laser key was turnes (set to ground)
     // If turnes then enable Laser
-    if (digitalRead(LASER_KEY) == 0)
+    if ((digitalRead(LASER_KEY) == 0) && (laserActivated == 0))
     {
+        laserActivated = 1;
+        //S2D_PlaySound(laser);
+        S2D_PlayMusic(mus, true);  // play on a loop
         digitalWrite(LASER_POWER, LOW);
+        
     }
 
     // Bypass management    
@@ -741,6 +747,7 @@ void Render()
         TimedActivate(TV_LIFT_UP, LOW, &tvLiftUpTimer, TV_LIFT_UP_DELAY);
         // Shutdown Laser
         digitalWrite(LASER_POWER, HIGH);
+        S2D_FadeOutMusic(2000);
 
     }
 
@@ -938,7 +945,7 @@ void on_key(S2D_Event e)
     {
     case S2D_KEY_DOWN:
         //printf("Key down: %s, %c\n", e.key, e.key[0]);
-        //if (strcmp(e.key, "Escape") == 0) S2D_Close(window);
+        if (strcmp(e.key, "Escape") == 0) S2D_Close(window);
         //if (strcmp(e.key, "Return") == 0) 
         //{
         //    MaxStage++;
@@ -1000,7 +1007,7 @@ int main()
     cleanUpFiles();
     
     wiringPiSetup() ;
-	
+    laserActivated = 0;
 	gunLights = 3;
 
     pinMode(SIMON_RED_BUTTON,   INPUT);
@@ -1141,8 +1148,9 @@ int main()
     txt->color.g = 0.8;
     txt->color.b = 0.0;
     txt->color.a = 1.0;
-
+    mus = S2D_CreateMusic("laserSound.mp3");
     snd = S2D_CreateSound("NFF-success.wav");
+    laser = S2D_CreateSound("laserSound.mp3");
 
     window->on_key = on_key;
 
@@ -1168,7 +1176,9 @@ int main()
     S2D_FreeText(txt);
 
     S2D_FreeSound(snd);  
-  
+    S2D_FreeSound(laser);
+    S2D_FreeMusic(mus);
+    
     //S2D_FreeWindow(window);
 
     S2D_Close(window);
