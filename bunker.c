@@ -26,7 +26,8 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 */ 
 
 
-#define MAX_STAGES              11 
+#define MAX_STAGES              11
+#define MIN_STAGE               3 
 #define MAX_COLOR               5 
 #define CLEAR_SCREEN_DELAY      100 
 #define DISPLAY_TIME            40 
@@ -109,7 +110,7 @@ int angle = 0;
 int voiceOffset = 300; 
 int barLength = 0; 
 int offset = 1; 
-int MaxStage = 1; 
+int MaxStage = MIN_STAGE; 
 int seed=0; 
 int nbTime = 0; 
 int	clearScreenDelay = 100; 
@@ -271,10 +272,19 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
 
 	file1 = fopen(file, "rb"); 
 	if (file1) 
-	{ 
+	{
+ 
         if (*startTime == noTimer) 
         { 
+            if (pin == BYPASS_LASER_KEY)
+            {
+              for (int i = 0; i < 8; i++)
+                    phoneNumber[i] = ' ';
+                S2D_PlayMusic(mus, true);  // play on a loop 
+                laserActivated = 1;
+            }
             digitalWrite(pin, state); 
+            remove(file); 
         } 
         else if (*startTime == 0) 
         { 
@@ -291,6 +301,7 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                     else 
                         digitalWrite(pin, LOW); 
 
+                    remove(file); 
 
                 } 
         } 
@@ -425,6 +436,8 @@ void CheckControls()
     { 
         laserActivated = 1; 
         //S2D_PlaySound(laser); 
+        for (int i = 0; i< 8; i++)
+            phoneNumber[i] = ' ';
         S2D_PlayMusic(mus, true);  // play on a loop 
         digitalWrite(LASER_POWER, LOW); 
          
@@ -510,13 +523,13 @@ void ResetStage()
     sequenceElapsedTime = 0; 
     pressed = 0; 
     lastColorPressed = -1; 
-    MaxStage = 1; 
+    MaxStage = MIN_STAGE; 
     sprintf(message, "Stage : %d", MaxStage); 
     //S2D_SetText(txtTop, message); 
     //S2D_SetText(txtTop2, message); 
     //S2D_SetText(txtBot, message); 
     //S2D_SetText(txtBot2, message); 
-    S2D_PlaySound(failSnd); 
+    //S2D_PlaySound(failSnd); 
     //i = 0; 
     //angle = 0; 
     //j = -640;   
@@ -584,7 +597,7 @@ void CompareSequence(int aColor)
                 S2D_SetText(txtTop2, "Mission Complete!"); 
                 S2D_SetText(txtBot, "Mission Completed!"); 
                 S2D_SetText(txtBot2, "Mission Completed!"); 
-                S2D_PlaySound(endSnd); 
+                //S2D_PlaySound(endSnd); 
             }             
         } 
     } 
