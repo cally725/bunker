@@ -27,7 +27,7 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 
 
 #define MAX_STAGES              11
-#define MIN_STAGE               3 
+#define MIN_STAGE               1 
 #define MAX_COLOR               5 
 #define CLEAR_SCREEN_DELAY      100 
 #define DISPLAY_TIME            40 
@@ -430,7 +430,7 @@ void CheckControls()
     } 
      
     // Laser Key management 
-    // Check if Laser key was turnes (set to ground) 
+    // Check if Laser key was turned (set to ground) 
     // If turnes then enable Laser 
     if ((digitalRead(LASER_KEY) == 0) && (laserActivated == 0)) 
     { 
@@ -442,8 +442,19 @@ void CheckControls()
         digitalWrite(LASER_POWER, LOW); 
          
     } 
+}
 
-
+/* 
+ * Function :   CheckAllBypasss 
+ * Description: Verify all game inputs and bypass 
+ *  
+ * Parameters:  None 
+ * 
+ * Return       No return value 
+ *  
+ */ 
+void CheckAllBypass() 
+{ 
     // Bypass management     
     // Check if any of the bypass file exist 
     checkBypass(laserKeyBypass, BYPASS_LASER_KEY, LOW, &noTimer, 0); 
@@ -823,6 +834,7 @@ void Render()
     { 
         TimedActivate(TV_LIFT_DOWN, LOW, &tvLiftDownTimer, TV_LIFT_DOWN_DELAY); 
         CheckControls(); 
+        CheckAllBypass();
         ClearScreen(); 
         return; 
     } 
@@ -834,7 +846,7 @@ void Render()
         digitalWrite(LASER_POWER, HIGH); 
         S2D_FadeOutMusic(2000); 
 
-
+        CheckAllBypass(); 
     } 
 
 
