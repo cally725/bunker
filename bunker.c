@@ -3,26 +3,26 @@
 #include <time.h> 
 
 /* 
-Game    Room                Device                  WiringPi    Pi Pin  I/O 
-Bunker	Exterieur	        Gun Switch	            5	        18	    In 
-					        Gun Door	            6	        22	    Out 
-                            Gun Bypass	            6	        22	    Out                     
-                            Gun Light 1	            14	        23	    Out                     
-                            Gun Light 2	            15	        8	    Out                     
-                            Gun Light 3	            16	        10	    Out                     
-                     
-        Bunker              Simon rouge	            0	        11	    In  
-                            Simon bleu	            1	        12	    In  
-                            Simon jaune	            2	        13	    In  
-                            Simon vert	            3	        15	    In  
-                            Simon blanc	            4	        16	    In  
-                            Laser Key	            7	        7	    In  
-                            Laser Key Bypass	    10	        24	    Out 
-                            Laser power	            10	        24	    Out 
-                            TV lift up	            11	        26	    Out 
-                            TV lift up Bypass	    11	        26	    Out 
-                            TV lift down	        12	        19	    Out 
-                            Hand Sensor Bypass      13	        21	    Out 
+Game    Room                Device                  WiringPi    Pi Pin  I/O
+Bunker  Exterieur           Gun Switch              5           18      In
+                            Gun Door                6           22      Out
+                            Gun Bypass              6           22      Out
+                            Gun Light 1             14          23      Out
+                            Gun Light 2             15          8       Out
+                            Gun Light 3             16          10      Out
+
+        Bunker              Simon rouge             0           11      In
+                            Simon bleu              1           12      In
+                            Simon jaune             2           13      In
+                            Simon vert              3           15      In
+                            Simon blanc             4           16      In
+                            Laser Key               7           7       In
+                            Laser Key Bypass        10          24      Out
+                            Laser power             10          24      Out
+                            TV lift up              11          26      Out
+                            TV lift up Bypass       11          26      Out
+                            TV lift down            12          19      Out
+                            Hand Sensor Bypass      13          21      Out
 */ 
 
 
@@ -61,7 +61,11 @@ Bunker	Exterieur	        Gun Switch	            5	        18	    In
 #define BYPASS_TV_LIFT_UP       11 
 #define TV_LIFT_DOWN            12 
 #define BYPASS_TV_LIFT_DOWN     12 
-#define BYPASS_HAND_SENSOR      13 
+#define BYPASS_HAND_SENSOR      13
+#define BYPASS_LIGHT_1          14
+#define BYPASS_LIGHT_2          15
+#define BYPASS_LIGHT_3          16
+#define BYPASS_SIMON            17
 #define TV_LIFT_UP_DELAY        60 
 #define TV_LIFT_DOWN_DELAY      60 
 #define DOOR_GACHE_DELAY        10 
@@ -84,7 +88,11 @@ char laserKeyBypass[30] = {"BYPASS_LASER_KEY"};
 char tvLiftUpBypass[30] = {"BYPASS_TV_LIFT_UP"}; 
 char tvLiftDownBypass[30] = {"BYPASS_TV_LIFT_DOWN"}; 
 char handSensorBypass[30] = {"BYPASS_HAND_SENSOR"}; 
-char stopBunker[20] = {"STOP_BUNKER"}; 
+char stopBunker[30] = {"STOP_BUNKER"}; 
+char light1Bypass[30] = {"BYPASS_LIGHT_1"};
+char light2Bypass[30] = {"BYPASS_LIGHT_2"};
+char light3Bypass[30] = {"BYPASS_LIGHT_3"};
+char simonBypass[30] = {"BYPASS_SIMON"};
 
 
 time_t gunDoorTimer = 0; 
@@ -113,7 +121,7 @@ int offset = 1;
 int MaxStage = MIN_STAGE; 
 int seed=0; 
 int nbTime = 0; 
-int	clearScreenDelay = 100; 
+int clearScreenDelay = 100; 
 int lastColorPressed = -1; 
 int pressed = 0; 
 int currentStage = 0; 
@@ -201,7 +209,7 @@ S2D_Window *window;
  * Function :   InsertPhoneDidgit 
  * Description: Insert the input caracter in the sirial string 
  *  
- * Parameters:  c           Input character 
+ * Parameters:  c Input character 
  * 
  * Return       No return value 
  *  
@@ -231,23 +239,23 @@ void InsertPhoneDidgit(char c)
  */ 
 int CheckPhoneNumber() 
 { 
-	if (laserActivated == 1)
-	{
+    if (laserActivated == 1)
+    {
         validPhoneNumber = 1; 
-		int i;  
-		for (int j = 0; j < MAX_CODE_NUMBER_DIGIT; j++) 
-		{ 
-			validPhoneNumber = 1; 
-			for (i = 0; i < MAX_CODE_NUMBER_DIGIT; i++) 
-				if (phoneNumber[(i+j) % MAX_CODE_NUMBER_DIGIT] != RefPhoneNumber[i]) 
-				{ 
-					validPhoneNumber = 0; 
-					break; 
-				} 
-			if (validPhoneNumber == 1) 
-				break; 
-		} 
-	}    
+        int i;  
+        for (int j = 0; j < MAX_CODE_NUMBER_DIGIT; j++) 
+        { 
+            validPhoneNumber = 1; 
+            for (i = 0; i < MAX_CODE_NUMBER_DIGIT; i++) 
+                if (phoneNumber[(i+j) % MAX_CODE_NUMBER_DIGIT] != RefPhoneNumber[i]) 
+                { 
+                    validPhoneNumber = 0; 
+                    break; 
+                } 
+            if (validPhoneNumber == 1) 
+                break; 
+        } 
+    }    
     return validPhoneNumber; 
 } 
 
@@ -266,13 +274,13 @@ int CheckPhoneNumber()
  */ 
 void checkBypass(char *file, int pin, int state, time_t *startTime, int delay) 
 { 
-	FILE *file1; 
+    FILE *file1; 
      
 
 
-	file1 = fopen(file, "rb"); 
-	if (file1) 
-	{
+    file1 = fopen(file, "rb"); 
+    if (file1) 
+    {
  
         if (*startTime == noTimer) 
         { 
@@ -282,6 +290,20 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                     phoneNumber[i] = ' ';
                 S2D_PlayMusic(mus, true);  // play on a loop 
                 laserActivated = 1;
+            }
+            if ((pin == BYPASS_LIGHT_1) || (pin == BYPASS_LIGHT_2) || (pin == BYPASS_LIGHT_3))
+            {
+                gunLights--; 
+                if (gunLights == 0)
+                {
+                    // Check if all lights are off then open the door
+                    FILE *fp = fopen("BYPASS_GUN", "ab+");
+                    fclose(fp);
+                }
+            }
+            if (pin == BYPASS_SIMON)
+            {
+                MaxStage = MAX_STAGES;
             }
             digitalWrite(pin, state); 
             remove(file); 
@@ -306,7 +328,7 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                 } 
         } 
         fclose(file1); 
-	} 
+    } 
 } 
 
 
@@ -322,16 +344,16 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
  */ 
 int checkEndRequest(char *file) 
 { 
-	FILE *file1; 
+    FILE *file1; 
      
 
 
-	file1 = fopen(file, "rb"); 
-	if (file1) 
-	{ 
+    file1 = fopen(file, "rb"); 
+    if (file1) 
+    { 
         fclose(file1); 
         return 1; 
-	} 
+    } 
     else 
     { 
         return 0; 
@@ -377,21 +399,21 @@ bool debunceLightsInput(int input)
 { 
     if (digitalRead(input) == 0)
     { 
-		if  (lightsState == 0)
-		{
-			lightsState = 1;
-			return true; 
-		}
-		else
-		{
-			return false;
-		}
+        if  (lightsState == 0)
+        {
+            lightsState = 1;
+            return true; 
+        }
+        else
+        {
+            return false;
+        }
     } 
-	else
-	{
-		lightsState = 0;
+    else
+    {
+        lightsState = 0;
         return false; 
-	}
+    }
 } 
                              
 /* 
@@ -410,23 +432,23 @@ void CheckControls()
     // If pressed then close the corresponding light and open the door if all lights are off 
     if (debunceLightsInput(GUN_SWITCH) == true) 
     { 
-		switch (gunLights) 
-		{ 
-			case 3: 
-				digitalWrite(GUN_LIGHT_3, HIGH); 
-				gunLights--; 
-				break; 
-			case 2: 
-				digitalWrite(GUN_LIGHT_2, HIGH); 
-				gunLights--; 
-				break; 
-			case 1: 
-				// TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY); 
-				digitalWrite(GUN_LIGHT_1, HIGH); 
-				digitalWrite(GUN_DOOR, HIGH); 
-				gunLights--; 
-				break; 
-		} 
+        switch (gunLights) 
+        { 
+            case 3: 
+                digitalWrite(GUN_LIGHT_3, HIGH); 
+                gunLights--; 
+                break; 
+            case 2: 
+                digitalWrite(GUN_LIGHT_2, HIGH); 
+                gunLights--; 
+                break; 
+            case 1: 
+                // TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY); 
+                digitalWrite(GUN_LIGHT_1, HIGH); 
+                digitalWrite(GUN_DOOR, HIGH); 
+                gunLights--; 
+                break; 
+        } 
     } 
      
     // Laser Key management 
@@ -462,6 +484,10 @@ void CheckAllBypass()
     checkBypass(tvLiftUpBypass, BYPASS_TV_LIFT_UP, LOW, &tvLiftUpTimer, TV_LIFT_UP_DELAY); 
     checkBypass(tvLiftDownBypass, BYPASS_TV_LIFT_DOWN, LOW, &tvLiftDownTimer, TV_LIFT_DOWN_DELAY); 
     checkBypass(handSensorBypass, BYPASS_HAND_SENSOR, HIGH, &noTimer, 0); 
+    checkBypass(light1Bypass, BYPASS_LIGHT_1, HIGH, &noTimer, 0); 
+    checkBypass(light2Bypass, BYPASS_LIGHT_2, HIGH, &noTimer, 0); 
+    checkBypass(light3Bypass, BYPASS_LIGHT_3, HIGH, &noTimer, 0); 
+    checkBypass(simonBypass, BYPASS_SIMON, HIGH, &noTimer, 0); 
 } 
 
 
@@ -489,8 +515,6 @@ void RenderVerticalMessage(int x, int y, char *message)
         S2D_SetText(txt, letter); 
         S2D_DrawText(txt); 
         txt->y = txt->y + 35; 
-
-
     } 
      
 } 
@@ -507,16 +531,16 @@ void RenderVerticalMessage(int x, int y, char *message)
  */ 
 void CalcRandColor() 
 { 
-	randColor[0] = rand() % MAX_COLOR; 
-	while ((randColor[1] = (rand() % MAX_COLOR)) == randColor[0]); 
+    randColor[0] = rand() % MAX_COLOR; 
+    while ((randColor[1] = (rand() % MAX_COLOR)) == randColor[0]); 
     while ((randColor[2] = (rand() % MAX_COLOR)) == randColor[1]); 
     while ((randColor[3] = (rand() % MAX_COLOR)) == randColor[2]); 
-	while ((randColor[4] = (rand() % MAX_COLOR)) == randColor[3]); 
-	while ((randColor[5] = (rand() % MAX_COLOR)) == randColor[4]); 
+    while ((randColor[4] = (rand() % MAX_COLOR)) == randColor[3]); 
+    while ((randColor[5] = (rand() % MAX_COLOR)) == randColor[4]); 
     while ((randColor[6] = (rand() % MAX_COLOR)) == randColor[5]); 
-	while ((randColor[7] = (rand() % MAX_COLOR)) == randColor[6]); 
-	while ((randColor[8] = (rand() % MAX_COLOR)) == randColor[7]); 
-	while ((randColor[9] = (rand() % MAX_COLOR)) == randColor[8]); 
+    while ((randColor[7] = (rand() % MAX_COLOR)) == randColor[6]); 
+    while ((randColor[8] = (rand() % MAX_COLOR)) == randColor[7]); 
+    while ((randColor[9] = (rand() % MAX_COLOR)) == randColor[8]); 
 } 
 
 
@@ -535,7 +559,7 @@ void ResetStage()
     pressed = 0; 
     lastColorPressed = -1; 
     MaxStage = MIN_STAGE; 
-    sprintf(message, "Stage : %d", MaxStage); 
+    //sprintf(message, "Stage : %d", MaxStage); 
     //S2D_SetText(txtTop, message); 
     //S2D_SetText(txtTop2, message); 
     //S2D_SetText(txtBot, message); 
@@ -583,7 +607,7 @@ void CompareSequence(int aColor)
             pressed = 0; 
             nbTime = 0; 
             lastColorPressed = -1; 
-            sprintf(message, "Stage : %d", MaxStage); 
+            //sprintf(message, "Stage : %d", MaxStage); 
 
 
             //S2D_SetText(txtTop, message); 
@@ -633,21 +657,21 @@ bool InputButtonPressed(int button)
 
     if (digitalRead(button) == 0)
     { 
-		if  (colorState[button] == 0)
-		{
-			colorState[button] = 1;
-			return true; 
-		}
-		else
-		{
-			return false;
-		}
+        if  (colorState[button] == 0)
+        {
+            colorState[button] = 1;
+            return true; 
+        }
+        else
+        {
+            return false;
+        }
     } 
-	else
-	{
-		colorState[button] = 0;
+    else
+    {
+        colorState[button] = 0;
         return false; 
-	} 
+    } 
 } 
 
 
@@ -857,7 +881,7 @@ void Render()
             digitalRead(0); 
     } 
     CheckColorButtons(); 
-	    
+        
     if (clearScreenDelay++ < CLEAR_SCREEN_DELAY) 
     { 
         ClearScreen(); 
@@ -865,15 +889,15 @@ void Render()
 
         k = 0; 
     } 
-	else 
-	{ 
+    else 
+    { 
         if (missionCompleted == false) 
-		{ 
+        { 
             if ((++k % DISPLAY_TIME) == 0) 
             { 
                 nbTime++; 
             }; 
-				 
+                 
             if (nbTime == MaxStage) 
             { 
                 clearScreenDelay = 0; 
@@ -894,7 +918,7 @@ void Render()
                     320,  90, color[randColor[nbTime]][0], color[randColor[nbTime]][1], color[randColor[nbTime]][2], 1, 
                     150, 315, color[randColor[nbTime]][0], color[randColor[nbTime]][1], color[randColor[nbTime]][2], 1, 
                     320, 390, color[randColor[nbTime]][0], color[randColor[nbTime]][1], color[randColor[nbTime]][2], 1); 
-	   
+       
                 S2D_DrawTriangle( 
                     320,  90, color[randColor[nbTime]][0], color[randColor[nbTime]][1], color[randColor[nbTime]][2], 1, 
                     320, 390, color[randColor[nbTime]][0], color[randColor[nbTime]][1], color[randColor[nbTime]][2], 1, 
@@ -1012,12 +1036,12 @@ void Render()
    
     if (missionCompleted == false) 
     { 
-     	if (i==640) 
+        if (i==640) 
         { 
             i = 0; 
             j = -640; 
         } 
-	   
+       
         txtTop->x = i++; 
         txtTop2->x = j++; 
 
@@ -1147,13 +1171,13 @@ int main()
      
     wiringPiSetup() ; 
     laserActivated = 0; 
-	gunLights = 3; 
-	lightsState = 0;
-	colorState[RED]    = 0;
-	colorState[BLUE]   = 0;
-	colorState[YELLOW] = 0;
-	colorState[GREEN]  = 0;
-	colorState[WHITE]  = 0;
+    gunLights = 3; 
+    lightsState = 0;
+    colorState[RED]    = 0;
+    colorState[BLUE]   = 0;
+    colorState[YELLOW] = 0;
+    colorState[GREEN]  = 0;
+    colorState[WHITE]  = 0;
 
     pinMode(SIMON_RED_BUTTON,   INPUT); 
     pinMode(SIMON_BLUE_BUTTON,  INPUT); 
@@ -1171,6 +1195,7 @@ int main()
     pinMode(TV_LIFT_UP,         OUTPUT); 
     pinMode(TV_LIFT_DOWN,       OUTPUT); 
     pinMode(BYPASS_HAND_SENSOR, OUTPUT); 
+    pinMode(BYPASS_SIMON,       OUTPUT); 
 
 
     pullUpDnControl(SIMON_RED_BUTTON,    PUD_UP); 
@@ -1197,6 +1222,7 @@ int main()
     digitalWrite(TV_LIFT_DOWN,          HIGH);     
     pullUpDnControl(BYPASS_HAND_SENSOR, PUD_UP); 
     digitalWrite(BYPASS_HAND_SENSOR,    LOW); 
+    pullUpDnControl(BYPASS_SIMON,       PUD_UP); 
      
     srand(rand()); 
     CalcRandColor(); 
@@ -1281,12 +1307,12 @@ int main()
     txtTop2->y = 0; 
     txtBot->y = 430; 
     txtBot2->y = 430; 
-	   
+       
     txtTop->color.r = 0.0; 
     txtTop->color.g = 0.8; 
     txtTop->color.b = 0.0; 
     txtTop->color.a = 1.0; 
-	 
+     
     txtTop2->color.r = 0.0; 
     txtTop2->color.g = 0.8; 
     txtTop2->color.b = 0.0; 
@@ -1297,7 +1323,7 @@ int main()
     txtBot->color.g = 0.8; 
     txtBot->color.b = 0.0; 
     txtBot->color.a = 1.0; 
-		 
+         
     txtBot2->color.r = 0.0; 
     txtBot2->color.g = 0.8; 
     txtBot2->color.b = 0.0; 
@@ -1358,8 +1384,9 @@ int main()
     digitalWrite(TV_LIFT_DOWN,          HIGH);     
     digitalWrite(GUN_LIGHT_1,           HIGH); 
     digitalWrite(GUN_LIGHT_2,           HIGH); 
-    digitalWrite(GUN_LIGHT_3,           HIGH);	 
-    digitalWrite(BYPASS_HAND_SENSOR,    HIGH);	 
+    digitalWrite(GUN_LIGHT_3,           HIGH);   
+    digitalWrite(BYPASS_HAND_SENSOR,    HIGH);   
+    digitalWrite(BYPASS_SIMON,          HIGH);   
 
 
     return 0; 
