@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <simple2d.h> 
 #include <wiringPi.h> 
 #include <time.h> 
@@ -77,6 +79,7 @@ Bunker  Exterieur           Gun Switch              5           18      In
 #define DOWN                    0 
 #define UP                      1 
 
+void CompareSequence(int);
 
 /* 
  * Variable definition 
@@ -127,11 +130,12 @@ int pressed = 0;
 int currentStage = 0; 
 int sequenceElapsedTime = 0; 
 char *message; 
-char *letter; 
+char *letter;
+char *traceMessage; 
 int c=0; 
 int keyState = UP; 
 int gunLights = 3; 
-
+int simonBypassed = 0;
 
 S2D_Image *img; 
 S2D_Image *scan; 
@@ -206,6 +210,57 @@ S2D_Window *window;
 
 
 /* 
+ * Function :   Trace 
+ * Description: Insert the input string in the trace file
+ *  
+ * Parameters:  msg message to trace 
+ * 
+ * Return       No return value 
+ *  
+ */ 
+
+
+void Trace(char *mes) 
+{ 
+    FILE *file1; 
+    time_t timer;
+    char buffer[26];
+    struct tm* tm_info;
+
+    file1 = fopen("tracefile", "a"); 
+    if (file1) 
+    { 
+        time(&timer);
+        tm_info = localtime(&timer);
+
+        strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+
+        fprintf(file1, "%s : %s", buffer, mes);
+    }
+    fclose(file1); 
+} 
+
+void execGpio()
+{
+    char   psBuffer[1000];
+    FILE   *pPipe;
+
+    if( (pPipe = popen( "gpio readall", "r" )) != NULL )
+    {
+           /* Read pipe until end of file, or an error occurs. */
+
+        while(fgets(psBuffer, 1000, pPipe))
+        {
+            Trace(psBuffer);
+        }
+
+
+        /* Close pipe and print return value of pPipe. */
+        pclose( pPipe );
+    }
+}
+  
+/* 
  * Function :   InsertPhoneDidgit 
  * Description: Insert the input caracter in the sirial string 
  *  
@@ -253,7 +308,12 @@ int CheckPhoneNumber()
                     break; 
                 } 
             if (validPhoneNumber == 1) 
-                break; 
+            {
+                sprintf(traceMessage, "Valid code entered in keyboard starting SIMON\n");
+                Trace(traceMessage); 
+
+                break;
+            } 
         } 
     }    
     return validPhoneNumber; 
@@ -284,6 +344,9 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
  
         if (*startTime == noTimer) 
         { 
+            sprintf(traceMessage, "Bypassed : %s\n", file);
+            Trace(traceMessage); 
+           
             if (pin == BYPASS_LASER_KEY)
             {
               for (int i = 0; i < 8; i++)
@@ -303,6 +366,9 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
             }
             if (pin == BYPASS_SIMON)
             {
+                CompareSequence(0); 
+                simonBypassed = 1;
+                missionCompleted = true;
                 MaxStage = MAX_STAGES;
             }
             digitalWrite(pin, state); 
@@ -324,6 +390,8 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                         digitalWrite(pin, LOW); 
 
                     remove(file); 
+                    sprintf(traceMessage, "Bypassed : %s\n", file);
+                    Trace(traceMessage); 
 
                 } 
         } 
@@ -351,6 +419,9 @@ int checkEndRequest(char *file)
     file1 = fopen(file, "rb"); 
     if (file1) 
     { 
+        sprintf(traceMessage, "End request received : %s\n", file);
+        Trace(traceMessage); 
+
         fclose(file1); 
         return 1; 
     } 
@@ -435,14 +506,20 @@ void CheckControls()
         switch (gunLights) 
         { 
             case 3: 
+                sprintf(traceMessage, "GUN_LIGHT_3 OFF\n");
+                Trace(traceMessage); 
                 digitalWrite(GUN_LIGHT_3, HIGH); 
                 gunLights--; 
                 break; 
             case 2: 
+                sprintf(traceMessage, "GUN_LIGHT_2 OFF\n");
+                Trace(traceMessage); 
                 digitalWrite(GUN_LIGHT_2, HIGH); 
                 gunLights--; 
                 break; 
             case 1: 
+                sprintf(traceMessage, "GUN_LIGHT_1 OFF\n");
+                Trace(traceMessage); 
                 // TimedActivate(GUN_DOOR, HIGH, &gunDoorTimer, DOOR_GACHE_DELAY); 
                 digitalWrite(GUN_LIGHT_1, HIGH); 
                 digitalWrite(GUN_DOOR, HIGH); 
@@ -456,6 +533,8 @@ void CheckControls()
     // If turnes then enable Laser 
     if ((digitalRead(LASER_KEY) == 0) && (laserActivated == 0)) 
     { 
+        sprintf(traceMessage, "LASER ACTIVATED\n");
+        Trace(traceMessage); 
         laserActivated = 1; 
         //S2D_PlaySound(laser); 
         for (int i = 0; i< 8; i++)
@@ -589,7 +668,7 @@ void ResetStage()
 void CompareSequence(int aColor) 
 { 
     lastColorPressed = aColor; 
-    if (color[randColor[pressed]][3] == aColor) 
+    if ((color[randColor[pressed]][3] == aColor) || (simonBypassed == 1)) 
     { 
         if (pressed == 0) 
         { 
@@ -597,7 +676,7 @@ void CompareSequence(int aColor)
         } 
         pressed++; 
              
-        if (pressed == MaxStage) 
+        if ((pressed == MaxStage) || (simonBypassed == 1)) 
         { 
             srand(rand()); 
             CalcRandColor(); 
@@ -625,8 +704,10 @@ void CompareSequence(int aColor)
             txtBot->x = i++; 
             txtBot2->x = j++; 
          
-            if (MaxStage == MAX_STAGES) 
+            if ((MaxStage == MAX_STAGES) || (simonBypassed == 1)) 
             { 
+                sprintf(traceMessage, "MISSION COMPLETED\n");
+                Trace(traceMessage); 
                 missionCompleted = true; 
                 S2D_SetText(txtTop, "7 4 1 9 5"); 
                 S2D_SetText(txtTop2, "Mission Complete!"); 
@@ -1167,6 +1248,13 @@ void cleanUpFiles()
  */ 
 int main()  
 {     
+    traceMessage = (char*) malloc(100 * sizeof(char)); 
+
+    sprintf(traceMessage, "###################################################\n");
+    Trace(traceMessage); 
+    sprintf(traceMessage, "Starting Bunker\n");
+    Trace(traceMessage); 
+
     cleanUpFiles(); 
      
     wiringPiSetup() ; 
@@ -1223,6 +1311,8 @@ int main()
     pullUpDnControl(BYPASS_HAND_SENSOR, PUD_UP); 
     digitalWrite(BYPASS_HAND_SENSOR,    LOW); 
     pullUpDnControl(BYPASS_SIMON,       PUD_UP); 
+     
+    execGpio();
      
     srand(rand()); 
     CalcRandColor(); 
@@ -1297,7 +1387,7 @@ int main()
 
 
 
-    txtTop = S2D_CreateText("Alien-Encounters-Regular.ttf", "Missile Lance", 40); 
+    txtTop = S2D_CreateText("Alien-Encounters-Regular.ttf", "7 4 1 9 5", 40); 
     txtTop2 = S2D_CreateText("Alien-Encounters-Regular.ttf", "Missile Lance", 40); 
     txtBot = S2D_CreateText("Alien-Encounters-Regular.ttf", "Missile Launched", 40); 
     txtBot2 = S2D_CreateText("Alien-Encounters-Regular.ttf", "Missile Launched", 40); 
@@ -1356,6 +1446,7 @@ int main()
 
 
     free(message); 
+    free(traceMessage);
        
     S2D_FreeText(txtTop); 
     S2D_FreeText(txtTop2); 
