@@ -284,12 +284,15 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                 laserActivated = 1;
             }
             digitalWrite(pin, state); 
+            fclose(file1); 
             remove(file); 
         } 
         else if (*startTime == 0) 
         { 
             *startTime = time(NULL); 
             digitalWrite(pin, state); 
+            fclose(file1); 
+
         } 
         else 
         { 
@@ -300,12 +303,11 @@ void checkBypass(char *file, int pin, int state, time_t *startTime, int delay)
                         digitalWrite(pin, HIGH); 
                     else 
                         digitalWrite(pin, LOW); 
-
+                    fclose(file1); 
                     remove(file); 
 
                 } 
         } 
-        fclose(file1); 
 	} 
 } 
 
@@ -1316,8 +1318,8 @@ int main()
 
     window->on_key = on_key; 
 
-
-    S2D_ShowCursor(false); 
+    S2D_HideCursor();
+    //S2D_ShowCursor(false); 
     S2D_Show(window); 
     S2D_FreeImage(scan);   
     S2D_FreeImage(img);   
